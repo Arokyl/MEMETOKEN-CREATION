@@ -42,13 +42,13 @@ contract TokenFun is ERC20 {
         uint256 _priceMultiplier,
         address _treasury
     ) payable ERC20(_name, _symbol) {
-        require(msg.value > 0, "Initial ETH required");
 
         initialSupply = _initialSupply;
         priceMultiplier = _priceMultiplier;
         treasury = _treasury;
         owner = msg.sender;
-        basePrice = msg.value / _initialSupply;
+       basePrice = msg.value / initialSupply;
+require(msg.value > 0, "Initial ETH required");
 
         _mint(address(this), _initialSupply);
     }
