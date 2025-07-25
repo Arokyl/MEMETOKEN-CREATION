@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.20;
-error unAuthorized();
-contract TokenFun {
-    string public name;
-    string public symbol;
-    uint8 public constant decimals = 18;
 
-    uint256 public totalSupply;
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+error unAuthorized();
+
+contract TokenFun is ERC20 {
+    uint8 public constant DECIMALS = 18;
+
     uint256 public totalRaised;
     uint256 public constant SCALE = 1e18;
 
@@ -21,34 +22,35 @@ contract TokenFun {
 
     address public owner;
     address public treasury;
+
     struct TokenDetails {
         string _name;
         string _symbol;
-
     }
 
-    mapping(address => uint256) public balanceOf;
     mapping(address => TokenDetails[]) public tokenDetails;
 
     event TokensPurchased(address indexed buyer, uint256 amount, uint256 cost);
     event TokensSold(address indexed seller, uint256 amount, uint256 proceeds);
-    event Transfer(address indexed from, address indexed to, uint256 amount);
     event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
     event TreasuryUpdated(address indexed newTreasury);
 
-    constructor (
-        
+    constructor(
+        string memory _name,
+        string memory _symbol,
         uint256 _initialSupply,
         uint256 _priceMultiplier,
         address _treasury
-    ) payable {
+    ) payable ERC20(_name, _symbol) {
+        require(msg.value > 0, "Initial ETH required");
+
         initialSupply = _initialSupply;
         priceMultiplier = _priceMultiplier;
         treasury = _treasury;
         owner = msg.sender;
-         basePrice = msg.value/initialSupply;
+        basePrice = msg.value / _initialSupply;
 
-        _mint(address(this), initialSupply);
+        _mint(address(this), _initialSupply);
     }
 
     modifier onlyOwner() {
@@ -57,7 +59,7 @@ contract TokenFun {
     }
 
     function getCurrentPrice() public view returns (uint256) {
-        return basePrice + ((priceMultiplier * totalSupply) / SCALE);
+        return basePrice + ((priceMultiplier * totalSupply()) / SCALE);
     }
 
     function calculatePurchaseAmount(uint256 ethAmount) public view returns (uint256) {
@@ -82,10 +84,8 @@ contract TokenFun {
     }
 
     function sell(uint256 amount) external {
-        if (amount <= 0)
-        revert unAuthorized();
-
-        require(balanceOf[msg.sender] >= amount, "Not enough balance");
+        if (amount <= 0) revert unAuthorized();
+        require(balanceOf(msg.sender) >= amount, "Not enough balance");
 
         uint256 price = getCurrentPrice();
         uint256 ethValue = (amount * price) / SCALE;
@@ -102,37 +102,17 @@ contract TokenFun {
         emit TokensSold(msg.sender, amount, proceeds);
     }
 
-    function _mint(address to, uint256 amount) internal {
-        if (to == address(0))
-        revert unAuthorized();
-        totalSupply += amount;
-        balanceOf[to] += amount;
-        emit Transfer(address(0), to, amount);
+    function CreateToken(string memory _name, string memory _symbol) external {
+        tokenDetails[msg.sender].push(TokenDetails(_name, _symbol));
     }
-
-    function _transfer(address from, address to, uint256 amount) internal {
-        require(balanceOf[from] >= amount, "Insufficient balance");
-         if (to == address(0))
-        revert unAuthorized();
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-
-        emit Transfer(from, to, amount);
-    }
-    function CreateToken(string memory _name, string memory _symbol) payable external {
-    tokenDetails[msg.sender].push(TokenDetails(_name, _symbol));
-
-
-}
-
 
     function getTokenDetails(address user) external view returns (TokenDetails[] memory) {
-        return tokenDetails[user];}
+        return tokenDetails[user];
+    }
 
     // === Admin functions ===
     function setTreasury(address _treasury) external onlyOwner {
-        if (_treasury == address(0))
-        revert unAuthorized();
+        if (_treasury == address(0)) revert unAuthorized();
         treasury = _treasury;
         emit TreasuryUpdated(_treasury);
     }
@@ -147,6 +127,5 @@ contract TokenFun {
         payable(owner).transfer(address(this).balance);
     }
 
-    // Fallback to allow receiving ETH
     receive() external payable {}
 }
